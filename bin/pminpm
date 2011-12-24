@@ -1,0 +1,222 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var pm = require('../'), exec = require('child_process').exec, program = require('commander'), mkdirp = require('mkdirp'), os = require('os'), fs = require('fs'), util = require('util'), g = require('./requestFile'), config = require('./config'), content = require('./content').index;
+
+program.version(pm.version).option('-n, --name [value]', 'config your PM(package manage) name.', 'Xpm').option('-c, --css <engine>', 'set css engine support', 'less').option('-t, --template <engine>', 'set html template engine support', 'jade').option('-s, --architec <type>', 'set struct type(mvc,mvvm,mvp,reqbb) note: reqbb means require-backbone', 'mvc').parse(process.argv);
+
+if(program.rawArgs.length <= 2) {
+    program.prompt('Choose mode : 1.command_mode 2.interactive_mode', function(name) {
+        if(name === '2') {
+            var ce_list = config.ce_list, he_list = config.he_list, st_list = config.st_list;
+            program.prompt('please input pm name: ', function(name) {
+                program['name'] = name;
+                program.prompt("choose css engine: " + ce_list, function(ce) {
+                    program['css'] = ce;
+                    program.prompt("choose html template engine: " + he_list, function(he) {
+                        program['template'] = he;
+                        program.prompt("choose struct type: " + st_list, function(st) {
+                            program['architec'] = st;
+                            main();
+                        });
+                    });
+                });
+            });
+        }
+        else {
+            main();
+        }
+    });
+}
+else {
+    main();
+}
+// end-of-line code
+var eol = 'win32' == os.platform() ? '\r\n' : '\n', readme = 'Please put {content} code here.'
+
+function main() {
+    // Path
+    var path = (program.args.shift() || '.') + '/' + program.name;
+    // Generate application
+    (function createApplication(path) {
+        emptyDirectory(path, function(empty) {
+            if(empty) {
+                createApplicationAt(path);
+            }
+            else {
+                program.confirm('destination is not empty, continue? ', function(ok) {
+                    if(ok) {
+                        process.stdin.destroy();
+                        createApplicationAt(path);
+                    }
+                    else {
+                        abort('aborting');
+                    }
+                });
+            }
+        });
+    })(path);
+}
+
+var index = ["module.exports = require('./lib/{name}.js');"].join(eol);
+var app_js = ["exports = module.exports;			", "exports.version ='0.0.1-alpha';   "].join(eol);
+
+/**
+ * Build directory array .
+ *
+ */
+function build_path(path) {
+    var paths = config.dir['base'] + "," + (config.dir[program.architec] || '') + ',' + (config.custum_dir.tpl[program.template] || '') + ',' + (config.custum_dir.css[program.css] || 'less');
+    return paths.replace(/,+/g, ',').split(',').join(" " + path).split(' ').slice(1);
+}
+
+/**
+ * Create application at the given directory `path`.
+ *
+ * @param {String} path
+ */
+
+function createApplicationAt(path) {
+    process.on('exit', function() {
+        console.log();
+        console.log('   dont forget to install dependencies:');
+        console.log('   $ cd %s && npm install', path);
+        console.log();
+    });
+    var app_name = program.name || "xpm";
+    write(path + '/index.js', index.replace('{name}', app_name));
+    mkdir(path, function() {
+        mkdir(path + '/lib', function() {
+            write(path + '/lib/' + app_name + '.js', app_js);
+        });
+        mkdir(path + '/bin', function() {
+            write(path + '/bin/' + app_name, build_content(path));
+            write(path + '/bin/config.js', '//add your config info here');
+        });
+    });
+}
+
+/**
+ * prompt user to choose in the 'list' fllowwing the 'msg'
+ *
+ */
+function build_content(path) {
+    var _con = content,
+    // package.json
+    json = '{' + eol, ce = program.css, dir_arr = build_path(path), engine = program.template;
+    json += '+    "name": "' + program.name + '" \'' + eol;
+    json += '+\'  , "version": "0.0.1-alpha" \'' + eol;
+    json += '+\'  , "private": true \'' + eol;
+    json += '+\'  , "dependencies": { \'' + eol;
+    if(program.css)
+        json += '+\'     "' + program.css + '": ">= 0.0.1" \'' + eol;
+    if(program.template)
+        json += ' +\'   , "' + program.template + '": ">= 0.0.1" \'' + eol;
+    json += '+\'  } \'' + eol;
+    json += '+\'}';
+    var css_content = 'var ' + engine + 'Layout=' + config.template[engine + 'Layout']  + eol + 'var ' + engine + 'Index=' + config.template[engine + 'Index'] + eol;
+    _con = _con.replace("{name}", program.name).replace("{json}", json.replace(/\r\n/,''));
+    _con = _con.replace("{css_template}", css_content);
+    _con = _con.replace("{create_css}", ' write(path + "' + config.custum_dir.css[ce] + '/style.css",  "/*please write your '+ program.css +' code here!*/");' + eol);
+    _con = _con.replace("{create_js}", '//todo: choose some lib to use ' + program.architec + ' by yourself!'+eol);
+    _con = _con.replace("{create_template}", '//todo: load template to use ' + program.css + ' by yourself!' + eol);
+    _con = _con.replace("{create_html}", 'write(path +"/index.html",index_html);'+eol);
+    _con = _con.replace("{dir}","'"+ dir_arr+"'.split(',')"+eol);
+    return _con;
+}
+
+/**
+ * prompt user to choose in the 'list' fllowwing the 'msg'
+ *
+ * @param {String} msg
+ * @param {Array} list
+ */
+function prompts(msg, list) {
+    program.choose(list, function(i) {
+        console.log('you chose %d "%s"', i, list[i]);
+        program[msg] = list[i];
+    });
+}
+
+/**
+ * Get files from 'path' in internet and write it to 'filepath'.
+ *
+ * @param {Function} w
+ * @param {String} path
+ * @param {String} filePath
+ */
+
+function writeFile(w, path, filePath) {
+    var options = config.http;
+    options.path = path;
+    g.get(options, function(data) {
+        w(filePath, data);
+    });
+}
+
+/**
+ * Check if the given directory `path` is empty.
+ *
+ * @param {String} path
+ * @param {Function} fn
+ */
+
+function emptyDirectory(path, fn) {
+    fs.readdir(path, function(err, files) {
+        if(err && 'ENOENT' != err.code)
+            throw err;
+        fn(!files || !files.length);
+    });
+}
+
+/**
+ * echo str > path.
+ *
+ * @param {String} path
+ * @param {String} str
+ */
+
+function write(path, str) {
+    fs.writeFile(path, str);
+    console.log('   \x1b[36mcreate\x1b[0m : ' + path);
+}
+
+/**
+ * Mkdir -p.
+ *
+ * @param {String} path
+ * @param {Function} fn
+ */
+
+function mkdir(path, fn) {
+    mkdirp(path, 0755, function(err) {
+        if(err)
+            throw err;
+        console.log('   \033[36mcreate\033[0m : ' + path);
+        fn && fn();
+    });
+}
+
+/**
+ * Exit with the given `str`.
+ *
+ * @param {String} str
+ */
+
+function abort(str) {
+    console.error(str);
+    process.exit(1);
+}
+
+/**
+ * Log with the given `msg`.
+ *
+ * @param {String} msg
+ */
+
+function log(msg) {
+    console.log(msg);
+}
