@@ -1,6 +1,6 @@
 {
   "name"          : "pminpm",
-  "version"       : "0.1.0",
+  "version"       : "0.1.1-dev",
   "description"   : "A Package Manager In Package",
   "homepage"      : "https://github.com/zjhiphop/pminpm",
   "keywords"      : ["pminpm", "module", "package", "optimization", "tool"],

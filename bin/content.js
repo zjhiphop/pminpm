@@ -219,5 +219,30 @@ module.exports={
 	,"	  });                                                                                             "
 	,"	}                                                                                               "
 	,""
+  ].join(eol),
+  pkg_json:[
+     ' {																		'
+     ,'     "name"          : "{name}",                                         '
+     ,'     "version"       : "0.1.0-alpha",                                    '
+     ,'     "description"   : "A Package Manager to build {type} application",  '
+     ,'     "homepage"      : "https://www.example.com",                        '
+     ,'     "keywords"      : ["module", "package", "optimization", "tool"],    '
+     ,'     "author"        : "Your Name <Your Email>",                         '
+     ,'     "contributors"  : ["Your Name <Your Email>"],              '
+     ,'     "engines"       : {"node":">= 0.5.0 < 0.7.0"},                      '
+     ,'     "dependencies"  : {                                                 '
+     ,'                         "mkdirp": ">=0.0.7" ,                           '
+     ,'                         "commander": "0.3.2"                            '
+     ,'                       },                                                '
+     ,'     "repository"    : {                                                 '
+     ,'                         "type": "git",                                  '
+     ,'                         "url": "Your git project address"               '
+     ,'                       },                                                '
+     ,'     "main"          : "index",                                          '
+     ,'     "bin"           : {                                                 '
+     ,'                         "{name}": "./bin/{name}"                        '
+     ,'                       },                                                '
+     ,'     "preferGlobal"  : true                                              '
+     ,' }                                                                       '
   ].join(eol)
 }

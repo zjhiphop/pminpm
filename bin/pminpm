@@ -4,7 +4,7 @@
  * Module dependencies.
  */
 
-var pm = require('../'), exec = require('child_process').exec, program = require('commander'), mkdirp = require('mkdirp'), os = require('os'), fs = require('fs'), util = require('util'), g = require('./requestFile'), config = require('./config'), content = require('./content').index;
+var pm = require('../'), exec = require('child_process').exec, program = require('commander'), mkdirp = require('mkdirp'), os = require('os'), fs = require('fs'), util = require('util'), g = require('./requestFile'), config = require('./config'), content = require('./content').index,pkg=require('./content').pkg_json;
 
 program.version(pm.version).option('-n, --name [value]', 'config your PM(package manage) name.', 'Xpm').option('-c, --css <engine>', 'set css engine support', 'less').option('-t, --template <engine>', 'set html template engine support', 'jade').option('-s, --architec <type>', 'set struct type(mvc,mvvm,mvp,reqbb) note: reqbb means require-backbone', 'mvc').parse(process.argv);
 
@@ -70,7 +70,7 @@ var app_js = ["exports = module.exports;			", "exports.version ='0.0.1-alpha';  
  */
 function build_path(path) {
     var paths = config.dir['base'] + "," + (config.dir[program.architec] || '') + ',' + (config.custum_dir.tpl[program.template] || '') + ',' + (config.custum_dir.css[program.css] || 'less');
-    return paths.replace(/,+/g, ',').split(',').join(" " + path).split(' ').slice(1);
+    return paths.replace(/,+/g, ',').split(',');
 }
 
 /**
@@ -87,8 +87,9 @@ function createApplicationAt(path) {
         console.log();
     });
     var app_name = program.name || "xpm";
-    write(path + '/index.js', index.replace('{name}', app_name));
     mkdir(path, function() {
+        write(path + '/index.js', index.replace(/\{name\}/ig, app_name));
+        write(path + '/package.json', pkg.replace(/\{name\}/ig, app_name).replace("{type}",program.architec));
         mkdir(path + '/lib', function() {
             write(path + '/lib/' + app_name + '.js', app_js);
         });
@@ -107,7 +108,7 @@ function build_content(path) {
     var _con = content,
     // package.json
     json = '{' + eol, ce = program.css, dir_arr = build_path(path), engine = program.template;
-    json += '+    "name": "' + program.name + '" \'' + eol;
+    json += '    "name": "' + program.name + '" \'' + eol;
     json += '+\'  , "version": "0.0.1-alpha" \'' + eol;
     json += '+\'  , "private": true \'' + eol;
     json += '+\'  , "dependencies": { \'' + eol;
@@ -124,7 +125,7 @@ function build_content(path) {
     _con = _con.replace("{create_js}", '//todo: choose some lib to use ' + program.architec + ' by yourself!'+eol);
     _con = _con.replace("{create_template}", '//todo: load template to use ' + program.css + ' by yourself!' + eol);
     _con = _con.replace("{create_html}", 'write(path +"/index.html",index_html);'+eol);
-    _con = _con.replace("{dir}","'"+ dir_arr+"'.split(',')"+eol);
+    _con = _con.replace("{dir}","'"+ dir_arr+"'.split(',').join(' '+path).split(' ').slice(1)"+eol);
     return _con;
 }
 
